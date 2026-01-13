@@ -13,7 +13,6 @@ spring:
           lower-case-service-id: true
 
 
-
 eureka:
   client:
     service-url:

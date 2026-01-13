@@ -7,7 +7,6 @@ management:
     health:
       show-details: when_authorized
 
-
 app:
   name: "Explore With Me"
   version: "1.0.0"
