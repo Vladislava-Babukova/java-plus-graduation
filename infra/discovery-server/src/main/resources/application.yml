@@ -11,7 +11,7 @@ spring:
   cloud:
     config:
       enabled: true
-      fail-fast: true
+      fail-fast: false
 
 eureka:
   instance:
