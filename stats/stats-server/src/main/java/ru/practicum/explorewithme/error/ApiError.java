@@ -1,6 +1,9 @@
 package ru.practicum.explorewithme.error;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import org.springframework.http.HttpStatus;
 
 @Getter
