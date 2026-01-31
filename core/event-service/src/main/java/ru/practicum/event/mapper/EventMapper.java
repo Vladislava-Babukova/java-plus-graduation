@@ -35,9 +35,17 @@ public interface EventMapper {
     EventFullDto toEventFullDto(Event event, ResponseCategoryDto category, UserShortDto initiator, Long confirmedRequests, Long views);
 
     @Mapping(target = "id", source = "event.id")
+    @Mapping(target = "title", source = "event.title")
+    @Mapping(target = "annotation", source = "event.annotation")
+    @Mapping(target = "eventDate", source = "event.eventDate")
+    @Mapping(target = "paid", source = "event.paid")
+    @Mapping(target = "category", source = "category")
+    @Mapping(target = "initiator", source = "initiator")
     @Mapping(target = "confirmedRequests", expression = "java(confirmedRequests != null ? confirmedRequests : 0L)")
     @Mapping(target = "views", expression = "java(views != null ? views : 0L)")
-    EventShortDto toEventShortDto(Event event, ResponseCategoryDto category, UserShortDto initiator, Long confirmedRequests, Long views);
+    EventShortDto toEventShortDto(Event event, ResponseCategoryDto category,
+                                  UserShortDto initiator, Long confirmedRequests, Long views);
+
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "initiatorId", ignore = true)

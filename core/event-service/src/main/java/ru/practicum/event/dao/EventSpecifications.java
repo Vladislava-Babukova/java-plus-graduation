@@ -1,10 +1,8 @@
 package ru.practicum.event.dao;
 
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
-import ru.practicum.api.request.dto.RequestDto;
 import ru.practicum.event.dto.AdminEventDto;
 import ru.practicum.event.dto.EventParams;
 import ru.practicum.event.model.Event;
@@ -12,6 +10,7 @@ import ru.practicum.event.model.Event;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 public class EventSpecifications {
 
     public static Specification<Event> adminSpecification(AdminEventDto adminEventDto) {
@@ -19,7 +18,7 @@ public class EventSpecifications {
             List<Predicate> predicates = new ArrayList<>();
 
             if (adminEventDto.getUsers() != null) {
-                predicates.add(root.get("initiator").get("id").in(adminEventDto.getUsers()));
+                predicates.add(root.get("initiatorId").in(adminEventDto.getUsers()));
             }
 
             if (adminEventDto.getStates() != null) {
@@ -27,7 +26,7 @@ public class EventSpecifications {
             }
 
             if (adminEventDto.getCategories() != null) {
-                predicates.add(root.get("category").get("id").in(adminEventDto.getCategories()));
+                predicates.add(root.get("categoryId").in(adminEventDto.getCategories()));
             }
 
             if (adminEventDto.getRangeStart() != null) {
@@ -54,7 +53,7 @@ public class EventSpecifications {
             }
 
             if (params.getCategories() != null) {
-                predicates.add(root.get("category").get("id").in(params.getCategories()));
+                predicates.add(root.get("categoryId").in(params.getCategories()));
             }
 
             if (params.getPaid() != null) {
@@ -70,13 +69,7 @@ public class EventSpecifications {
             }
 
             if (params.getOnlyAvailable()) {
-                Join<Event, RequestDto> requestJoin = root.join("requests", JoinType.LEFT);
-                requestJoin.on(cb.equal(requestJoin.get("status"), "CONFIRMED"));
-                query.groupBy(root.get("id"));
-
-                Predicate unlimitedPredicate = cb.equal(root.get("participantLimit"), 0);
-                Predicate hasFreeSeatsPredicate = cb.greaterThan(root.get("participantLimit"), cb.count(requestJoin));
-                query.having(cb.or(unlimitedPredicate, hasFreeSeatsPredicate));
+                log.warn("OnlyAvailable filter is disabled - no requests relation in Event entity");
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
