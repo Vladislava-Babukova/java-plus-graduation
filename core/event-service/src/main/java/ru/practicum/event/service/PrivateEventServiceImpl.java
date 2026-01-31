@@ -35,17 +35,16 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Slf4j
 public class PrivateEventServiceImpl implements PrivateEventService {
 
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
-
+    private final EventServiceUtil eventServiceUtil;
     private final UserClient userClient;
     private final RequestClient requestClient;
     private final StatsClient statsClient;
-
+    private final CategoryServiceUtil categoryServiceUtil;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
@@ -60,7 +59,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         UserShortDto userShortDto = userMapper.toUserShortDto(userClient.getUserById(userId));
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, newEventDto.getCategory());
 
         Event newEvent = eventMapper.toEvent(newEventDto, userShortDto.getId(), categoryDto.getId());
@@ -89,7 +88,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         Long categoryId = updateEventRequest.getCategory() != null ? updateEventRequest.getCategory() : event.getCategoryId();
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, categoryId);
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
@@ -98,7 +97,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
         }
 
-        Long views = EventServiceUtil.getStatsViews(statsClient, event, true);
+        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
 
         log.info("Событие с ID {} обновлено пользователем с ID {}.", eventId, userId);
 
@@ -122,14 +121,14 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
 
         if (event.getPublishedOn() == null) {
             return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
         }
 
-        Long views = EventServiceUtil.getStatsViews(statsClient, event, true);
+        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
 
         return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, views);
     }
@@ -158,12 +157,12 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .map(Event::getCategoryId)
                 .collect(Collectors.toSet());
 
-        Map<Long, Long> views = EventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = CategoryServiceUtil
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil
                 .getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
 
-        return EventServiceUtil.getEventShortDtos(
+        return eventServiceUtil.getEventShortDtos(
                 Collections.singletonMap(userId, userShortDto),
                 categoryDtos,
                 events,

@@ -28,9 +28,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final EventRepository eventRepository;
 
-    /**
-     * === Public endpoints accessible to all users. ===
-     */
 
     @Override
     public List<ResponseCategoryDto> getCategories(int from, int size) {
@@ -54,10 +51,6 @@ public class CategoryServiceImpl implements CategoryService {
                 .map(categoryMapper::toCategoryDto)
                 .toList();
     }
-
-    /**
-     * === Admin endpoints accessible only for admins. ===
-     */
 
     @Override
     @Transactional

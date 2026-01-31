@@ -39,17 +39,16 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Slf4j
 public class AdminEventServiceImpl implements AdminEventService {
 
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
-
+    private final CategoryServiceUtil categoryServiceUtil;
     private final UserClient userClient;
     private final RequestClient requestClient;
     private final StatsClient statsClient;
-
+    private final EventServiceUtil eventServiceUtil;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
@@ -63,7 +62,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         validateCriticalRules(updateEventRequest, event);
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
 
         eventMapper.updateEvent(event, updateEventRequest);
@@ -82,7 +81,7 @@ public class AdminEventServiceImpl implements AdminEventService {
             return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
         }
 
-        Long views = EventServiceUtil.getStatsViews(statsClient, event, false);
+        Long views = eventServiceUtil.getStatsViews(statsClient, event, false);
 
         log.info("Администратором обновлено событие c ID {}.", event.getId());
 
@@ -105,7 +104,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, eventIds);
 
-        Map<Long, Long> views = EventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -115,12 +114,12 @@ public class AdminEventServiceImpl implements AdminEventService {
                 .map(Event::getCategoryId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = EventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = CategoryServiceUtil
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil
                 .getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
 
-        return EventServiceUtil.getEventFullDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceUtil.getEventFullDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
     }
 
     private static Pageable makePageable(AdminEventDto adminEventDto) {

@@ -40,16 +40,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PublicEventServiceImpl implements PublicEventService {
 
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
-
+    private final EventServiceUtil eventServiceUtil;
     private final UserClient userClient;
     private final RequestClient requestClient;
     private final StatsClient statsClient;
-
+    private final CategoryServiceUtil categoryServiceUtil;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
@@ -90,18 +89,18 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         buildStatsDtoAndHit(request);
 
-        Map<Long, Long> views = EventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
                 .collect(Collectors.toSet());
         Set<Long> categoriesIds = new HashSet<>(params.getCategories());
 
-        Map<Long, UserShortDto> userShortDtos = EventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = CategoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
 
-        return EventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
     }
 
     @Override
@@ -115,7 +114,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         buildStatsDtoAndHit(request);
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
 
         UserShortDto userShortDto = userMapper.toUserShortDto(userClient.getUserById(event.getInitiatorId()));
@@ -124,7 +123,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
         }
 
-        Long views = EventServiceUtil.getStatsViews(statsClient, event, true);
+        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
 
         EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, views);
 
@@ -148,7 +147,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
 
-        ResponseCategoryDto categoryDto = CategoryServiceUtil
+        ResponseCategoryDto categoryDto = categoryServiceUtil
                 .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
 
         UserShortDto userDto = userMapper.toUserShortDto(userClient.getUserById(event.getInitiatorId()));
@@ -157,7 +156,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             return eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, 0L);
         }
 
-        Long views = EventServiceUtil.getStatsViews(statsClient, event, true);
+        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
 
         EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, views);
 
@@ -183,7 +182,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, dbEventIds);
 
-        Map<Long, Long> views = EventServiceUtil.getStatsViewsMap(statsClient, dbEventIds);
+        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, dbEventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -192,12 +191,12 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .map(Event::getInitiatorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = EventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = CategoryServiceUtil
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil
                 .getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoryIds);
 
-        return EventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
     }
 
     private Pageable makePageable(EventParams params) {

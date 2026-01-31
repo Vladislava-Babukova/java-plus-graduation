@@ -11,9 +11,9 @@ spring:
         enabled: true
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:6544/explorewithme
-    username: explorewithme
-    password: explorewithme
+    url: jdbc:postgresql://localhost:6544/event_db
+    username: event_service
+    password: event_password
   jpa:
     show-sql: true
     hibernate:

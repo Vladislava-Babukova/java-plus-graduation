@@ -42,19 +42,16 @@ public class CompilationServiceImpl implements CompilationService {
     private final CompilationRepository compilationRepository;
     private final EventRepository eventRepository;
     private final CategoryRepository categoryRepository;
-
+    private final EventServiceUtil eventServiceUtil;
     private final UserClient userClient;
     private final RequestClient requestClient;
     private final StatsClient statsClient;
-
+    private final CategoryServiceUtil categoryServiceUtil;
     private final CompilationMapper compilationMapper;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
 
-    /**
-     * === Public endpoints accessible to all users. ===
-     */
 
     @Override
     public List<ResponseCompilationDto> getCompilations(Boolean pinned, int from, int size) {
@@ -124,9 +121,6 @@ public class CompilationServiceImpl implements CompilationService {
         return compilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
 
-    /**
-     * === Admin endpoints accessible only for admins. ===
-     */
 
     @Override
     @Transactional
@@ -189,7 +183,7 @@ public class CompilationServiceImpl implements CompilationService {
         List<Event> events = eventRepository.findAllById(new ArrayList<>(eventIds));
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, eventIds);
-        Map<Long, Long> views = EventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -198,11 +192,11 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(Event::getCategoryId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = EventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = CategoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoryIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoryIds);
 
-        return EventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
     }
 
 }

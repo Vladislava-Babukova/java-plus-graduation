@@ -1,6 +1,6 @@
 package ru.practicum.shared.util;
 
-import lombok.experimental.UtilityClass;
+import org.springframework.stereotype.Component;
 import ru.practicum.StatsParams;
 import ru.practicum.StatsUtil;
 import ru.practicum.StatsView;
@@ -21,10 +21,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@UtilityClass
+@Component
 public class EventServiceUtil {
 
-    public static StatsParams getStatsParams(Event event, boolean unique) {
+    public StatsParams getStatsParams(Event event, boolean unique) {
         return StatsUtil.buildStatsParams(
                 Collections.singletonList("/events/" + event.getId()),
                 unique,
@@ -32,7 +32,7 @@ public class EventServiceUtil {
         );
     }
 
-    public static Long getStatsViews(StatsClient statsClient, Event event, boolean unique) {
+    public Long getStatsViews(StatsClient statsClient, Event event, boolean unique) {
         StatsParams params = getStatsParams(event, unique);
 
         return statsClient.getStats(params).stream()
@@ -40,7 +40,7 @@ public class EventServiceUtil {
                 .sum();
     }
 
-    public static Map<Long, Long> getStatsViewsMap(StatsClient statsClient, Set<Long> eventIds) {
+    public Map<Long, Long> getStatsViewsMap(StatsClient statsClient, Set<Long> eventIds) {
         StatsParams statsParams = StatsUtil.buildStatsParams(
                 eventIds.stream()
                         .map(id -> "/events/" + id)
@@ -51,12 +51,12 @@ public class EventServiceUtil {
         return StatsUtil.getViewsMap(statsClient.getStats(statsParams));
     }
 
-    public static Map<Long, UserShortDto> getUserShortDtoMap(UserClient userClient, Set<Long> userIds, UserMapper userMapper) {
+    public Map<Long, UserShortDto> getUserShortDtoMap(UserClient userClient, Set<Long> userIds, UserMapper userMapper) {
         return userClient.getAllByIds(userIds).stream()
                 .collect(Collectors.toMap(UserDto::getId, userMapper::toUserShortDto));
     }
 
-    public static List<EventFullDto> getEventFullDtos(
+    public List<EventFullDto> getEventFullDtos(
             Map<Long, UserShortDto> userShortDtos,
             Map<Long, ResponseCategoryDto> categoryDtos,
             List<Event> events,
@@ -77,7 +77,7 @@ public class EventServiceUtil {
                 .toList();
     }
 
-    public static List<EventShortDto> getEventShortDtos(
+    public List<EventShortDto> getEventShortDtos(
             Map<Long, UserShortDto> userShortDtos,
             Map<Long, ResponseCategoryDto> categoryDtos,
             List<Event> events,
@@ -97,5 +97,4 @@ public class EventServiceUtil {
                 )
                 .toList();
     }
-
 }
