@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-import static ru.practicum.StatsUtil.*;
+import static ru.practicum.StatsUtil.IP_ADDRESS_PATTERN;
 
 @Data
 @AllArgsConstructor
