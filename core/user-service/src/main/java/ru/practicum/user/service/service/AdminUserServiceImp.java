@@ -1,0 +1,109 @@
+package ru.practicum.user.service.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.api.user.dto.UserDto;
+import ru.practicum.user.service.dao.UserRepository;
+import ru.practicum.user.service.dto.NewUserRequest;
+import ru.practicum.user.service.dto.UserShortDto;
+import ru.practicum.user.service.error.exception.NotFoundException;
+import ru.practicum.user.service.mapper.UserMapper;
+import ru.practicum.user.service.model.User;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class AdminUserServiceImp implements AdminUserService {
+
+    private final UserRepository repository;
+    private final UserMapper mapper;
+
+    @Override
+    public UserDto create(NewUserRequest newUserRequest) {
+        log.info("creating user {}", newUserRequest);
+        User user = mapper.toUser(newUserRequest);
+        if (user == null) {
+            throw new IllegalArgumentException("Incorrect data. User cannot be null.");
+        }
+        return mapper.toUserDto(repository.save(user));
+    }
+
+    @Override
+    public void delete(Long userId) {
+        log.info("Deleting user with id: {}", userId);
+        if (!repository.existsById(userId)) {
+            throw new NotFoundException("user with id " + userId + " not found");
+        }
+        repository.deleteById(userId);
+    }
+
+    @Override
+    public UserDto getUser(Long userId) {
+        log.info("Ищем пользователя по id: {}", userId);
+        User user = repository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь c id " + userId + " не найден"));
+        log.info("Пользователь с id: {} найден и отправлен", userId);
+        return mapper.toUserDto(user);
+    }
+
+    @Override
+    public UserShortDto getShortDto(Long userId) {
+        log.info("Ищем пользователя по id: {}", userId);
+        User user = repository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь c id " + userId + " не найден"));
+        log.info("Пользователь с id: {} найден и отправлен", userId);
+        return mapper.toUserShortDto(user);
+    }
+
+    @Override
+    public Boolean userExists(Long userId) {
+        return repository.existsById(userId);
+    }
+
+    @Override
+    public Map<Long, UserShortDto> getUsersShortDtoBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<User> users = repository.findAllById(ids);
+
+        return users.stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        mapper::toUserShortDto
+                ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserDto> getUsers(List<Long> ids, int from, int size) {
+        log.info("Getting users with ids: {}, from: {}, size: {}", ids, from, size);
+
+        int pageNumber = from / size;
+        Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("id").ascending());
+
+        Page<User> usersPage;
+
+        if (ids == null || ids.isEmpty()) {
+            usersPage = repository.findAll(pageable);
+        } else {
+            usersPage = repository.findAllByIdIn(ids, pageable);
+        }
+        return usersPage
+                .map(mapper::toUserDto)
+                .toList();
+    }
+}

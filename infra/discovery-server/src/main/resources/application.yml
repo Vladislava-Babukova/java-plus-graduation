@@ -1,18 +1,6 @@
 server:
   port: 8761
 
-spring:
-  application:
-    name: discovery-server
-
-  config:
-    import: optional:configserver:http://localhost:8888
-
-  cloud:
-    config:
-      enabled: true
-      fail-fast: false
-
 eureka:
   instance:
     hostname: localhost
@@ -21,8 +9,13 @@ eureka:
     fetchRegistry: false
     serviceUrl:
       defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    eviction-interval-timer-in-ms: 5000
 
 management:
+  endpoint:
+    health:
+      enabled: true
   endpoints:
     web:
       exposure:
