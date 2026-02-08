@@ -5,15 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import ru.practicum.api.category.dto.ResponseCategoryDto;
 import ru.practicum.api.event.dto.EventFullDto;
 import ru.practicum.api.event.enums.EventState;
 import ru.practicum.api.request.enums.RequestStatus;
 import ru.practicum.api.user.dto.UserShortDto;
-import ru.practicum.category.dao.CategoryRepository;
-import ru.practicum.category.mapper.CategoryMapper;
-import ru.practicum.client.StatsClient;
+import ru.practicum.client.RecommendationsClient;
 import ru.practicum.event.client.request.RequestClient;
 import ru.practicum.event.client.user.UserClient;
 import ru.practicum.event.dao.EventRepository;
@@ -27,14 +27,11 @@ import ru.practicum.event.model.Event;
 import ru.practicum.shared.error.exception.BadRequestException;
 import ru.practicum.shared.error.exception.NotFoundException;
 import ru.practicum.shared.error.exception.RuleViolationException;
-import ru.practicum.shared.util.CategoryServiceUtil;
-import ru.practicum.shared.util.EventServiceUtil;
+import ru.practicum.shared.util.CategoryServiceHelper;
+import ru.practicum.shared.util.EventServiceHelper;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,49 +40,62 @@ import java.util.stream.Collectors;
 public class AdminEventServiceImpl implements AdminEventService {
 
     private final EventRepository eventRepository;
-    private final CategoryRepository categoryRepository;
-    private final CategoryServiceUtil categoryServiceUtil;
+    private final CategoryServiceHelper categoryServiceHelper;
     private final UserClient userClient;
     private final RequestClient requestClient;
-    private final StatsClient statsClient;
-    private final EventServiceUtil eventServiceUtil;
+    private final RecommendationsClient recommendationsClient;
+    private final EventServiceHelper eventServiceHelper;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
-    private final CategoryMapper categoryMapper;
+
+    private final TransactionTemplate transactionTemplate;
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // we're going to handle transactions manually
     public EventFullDto update(Long eventId, UpdateEventRequest updateEventRequest) throws RuleViolationException {
         log.info("Администратором обновляется событие c ID {}: {}", eventId, updateEventRequest);
 
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Событие с ID " + eventId + " не найдено"));
+        Map<String, Object> resultData = transactionTemplate.execute(status -> {
+            Event event = eventRepository.findById(eventId)
+                    .orElseThrow(() -> new NotFoundException("Событие с ID " + eventId + " не найдено"));
 
-        validateCriticalRules(updateEventRequest, event);
+            validateCriticalRules(updateEventRequest, event);
 
-        ResponseCategoryDto categoryDto = categoryServiceUtil
-                .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
+            ResponseCategoryDto categoryDto = categoryServiceHelper
+                    .getResponseCategoryDto(event.getCategoryId());
 
-        eventMapper.updateEvent(event, updateEventRequest);
+            eventMapper.updateEvent(event, updateEventRequest);
 
-        if (Objects.equals(updateEventRequest.getStateAction(), StateAction.PUBLISH_EVENT)) {
-            event.setPublishedOn(LocalDateTime.now());
-        }
+            if (Objects.equals(updateEventRequest.getStateAction(), StateAction.PUBLISH_EVENT)) {
+                event.setPublishedOn(LocalDateTime.now());
+            }
 
-        eventRepository.save(event);
+            Event eventUpdated = eventRepository.saveAndFlush(event);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("event", eventUpdated);
+            data.put("categoryDto", categoryDto);
+
+            return data;
+        });
+
+        Event event = (Event) resultData.get("event");
+        ResponseCategoryDto categoryDto = (ResponseCategoryDto) resultData.get("categoryDto");
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
 
         UserShortDto userShortDto = userMapper.toUserShortDto(userClient.getUserById(event.getInitiatorId()));
 
         if (event.getPublishedOn() == null) {
-            return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
+            return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0.0);
         }
 
-        Long views = eventServiceUtil.getStatsViews(statsClient, event, false);
+        double rating = eventServiceHelper.getRatingsMap(Set.of(event.getId()))
+                .getOrDefault(event.getId(), 0.0);
 
         log.info("Администратором обновлено событие c ID {}.", event.getId());
 
-        return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, views);
+        return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, rating);
     }
 
     @Override
@@ -104,7 +114,7 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, eventIds);
 
-        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Double> ratings = eventServiceHelper.getRatingsMap(eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -114,12 +124,12 @@ public class AdminEventServiceImpl implements AdminEventService {
                 .map(Event::getCategoryId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceHelper.getUserShortDtoMap(userIds);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil
-                .getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceHelper
+                .getResponseCategoryDtoMap(categoriesIds);
 
-        return eventServiceUtil.getEventFullDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceHelper.getEventFullDtos(userShortDtos, categoryDtos, events, confirmedRequests, ratings, eventMapper);
     }
 
     private static Pageable makePageable(AdminEventDto adminEventDto) {

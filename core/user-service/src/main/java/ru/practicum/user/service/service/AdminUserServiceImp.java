@@ -11,15 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.api.user.dto.UserDto;
 import ru.practicum.user.service.dao.UserRepository;
 import ru.practicum.user.service.dto.NewUserRequest;
-import ru.practicum.user.service.dto.UserShortDto;
 import ru.practicum.user.service.error.exception.NotFoundException;
 import ru.practicum.user.service.mapper.UserMapper;
 import ru.practicum.user.service.model.User;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,44 +43,6 @@ public class AdminUserServiceImp implements AdminUserService {
             throw new NotFoundException("user with id " + userId + " not found");
         }
         repository.deleteById(userId);
-    }
-
-    @Override
-    public UserDto getUser(Long userId) {
-        log.info("Ищем пользователя по id: {}", userId);
-        User user = repository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь c id " + userId + " не найден"));
-        log.info("Пользователь с id: {} найден и отправлен", userId);
-        return mapper.toUserDto(user);
-    }
-
-    @Override
-    public UserShortDto getShortDto(Long userId) {
-        log.info("Ищем пользователя по id: {}", userId);
-        User user = repository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь c id " + userId + " не найден"));
-        log.info("Пользователь с id: {} найден и отправлен", userId);
-        return mapper.toUserShortDto(user);
-    }
-
-    @Override
-    public Boolean userExists(Long userId) {
-        return repository.existsById(userId);
-    }
-
-    @Override
-    public Map<Long, UserShortDto> getUsersShortDtoBatch(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return new HashMap<>();
-        }
-
-        List<User> users = repository.findAllById(ids);
-
-        return users.stream()
-                .collect(Collectors.toMap(
-                        User::getId,
-                        mapper::toUserShortDto
-                ));
     }
 
     @Override

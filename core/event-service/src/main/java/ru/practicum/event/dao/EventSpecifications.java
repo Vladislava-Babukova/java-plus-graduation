@@ -1,8 +1,8 @@
 package ru.practicum.event.dao;
 
 import jakarta.persistence.criteria.Predicate;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Component;
 import ru.practicum.event.dto.AdminEventDto;
 import ru.practicum.event.dto.EventParams;
 import ru.practicum.event.model.Event;
@@ -10,7 +10,7 @@ import ru.practicum.event.model.Event;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
+@Component
 public class EventSpecifications {
 
     public static Specification<Event> adminSpecification(AdminEventDto adminEventDto) {
@@ -69,7 +69,8 @@ public class EventSpecifications {
             }
 
             if (params.getOnlyAvailable()) {
-                log.warn("OnlyAvailable filter is disabled - no requests relation in Event entity");
+                query.groupBy(root.get("id"));
+                query.having(cb.equal(root.get("participantLimit"), 0));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
