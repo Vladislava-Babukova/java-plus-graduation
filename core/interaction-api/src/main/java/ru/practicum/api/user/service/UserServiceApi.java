@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 public interface UserServiceApi {
-    String URL = "/ru/practicum/api/v1/internal/users";
+    String URL = "/api/v1/internal/users";
 
     @GetMapping(path = URL + "/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
     UserDto getUserById(@Positive @PathVariable Long userId);

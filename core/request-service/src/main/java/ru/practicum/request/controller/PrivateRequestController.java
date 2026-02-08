@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.api.request.dto.RequestDto;
 import ru.practicum.request.dto.RequestStatusUpdate;
 import ru.practicum.request.dto.RequestStatusUpdateResult;
-import ru.practicum.request.error.exception.BadRequestException;
 import ru.practicum.request.service.RequestService;
 
 import java.util.List;
@@ -29,11 +28,8 @@ public class PrivateRequestController {
     @ResponseStatus(HttpStatus.CREATED)
     public RequestDto addParticipationRequest(
             @PathVariable Long userId,
-            @RequestParam(required = false) Long eventId  // вот это ключевое изменение!
+            @RequestParam Long eventId
     ) {
-        if (eventId == null) {
-            throw new BadRequestException("Event id is required");
-        }
         return requestService.createRequest(userId, eventId);
     }
 

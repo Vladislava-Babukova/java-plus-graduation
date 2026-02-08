@@ -1,6 +1,6 @@
 package ru.practicum.comment.client.event;
 
-import io.github.resilience4j.core.lang.Nullable;
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Positive;
 import jakarta.ws.rs.ServiceUnavailableException;
 import lombok.extern.slf4j.Slf4j;
@@ -29,4 +29,3 @@ public class EventClientFallback implements EventClient {
     }
 
 }
-
