@@ -109,7 +109,13 @@ public class RecommendationsServiceImpl implements RecommendationsService {
 
                     log.debug("Numerator: {}, Denominator: {}", numerator, denominator);
 
-                    double prediction = denominator != 0 ? numerator / denominator : 0.0;
+                    double prediction;
+                    if (denominator == 0 || Math.abs(denominator) < 0.000001) {
+                        log.debug("Denominator is zero or too small for event {}. Using default prediction.", predictedEventId);
+                        prediction = 0.0;
+                    } else {
+                        prediction = numerator / denominator;
+                    }
 
                     return RecommendedEventProto.newBuilder()
                             .setEventId(predictedEventId)

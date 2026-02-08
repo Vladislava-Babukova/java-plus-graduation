@@ -23,6 +23,7 @@ import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.mapper.UserMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.shared.error.exception.BadRequestException;
+import ru.practicum.shared.error.exception.LikeValidationException;
 import ru.practicum.shared.error.exception.NotFoundException;
 import ru.practicum.shared.util.CategoryServiceHelper;
 import ru.practicum.shared.util.EventServiceHelper;
@@ -212,7 +213,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         if (event.getRequestModeration() || event.getParticipantLimit() != 0) {
             if (event.getInitiatorId() != userId && requestClient.getEventRequests(userId, eventId).stream()
                     .filter(o -> o.getStatus().equals(RequestStatus.CONFIRMED.name())).toList().isEmpty()) {
-                throw new BadRequestException("Пользователь = " + userId + " не может лайкать мероприятие = " + eventId);
+                throw new LikeValidationException("Пользователь = " + userId + " не может лайкать мероприятие = " + eventId);
             }
         }
 
