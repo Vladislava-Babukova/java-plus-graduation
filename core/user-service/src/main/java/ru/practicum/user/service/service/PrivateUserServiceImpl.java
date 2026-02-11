@@ -1,11 +1,11 @@
 package ru.practicum.user.service.service;
 
+import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.practicum.api.user.dto.UserDto;
 import ru.practicum.user.service.dao.UserRepository;
-import ru.practicum.user.service.error.exception.NotFoundException;
 import ru.practicum.user.service.mapper.UserMapper;
 
 import java.util.List;

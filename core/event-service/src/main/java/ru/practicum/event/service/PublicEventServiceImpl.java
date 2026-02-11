@@ -3,23 +3,17 @@ package ru.practicum.event.service;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.StatsDto;
-import ru.practicum.StatsUtil;
 import ru.practicum.api.category.dto.ResponseCategoryDto;
 import ru.practicum.api.event.dto.EventFullDto;
 import ru.practicum.api.event.dto.EventShortDto;
 import ru.practicum.api.event.enums.EventState;
 import ru.practicum.api.request.enums.RequestStatus;
 import ru.practicum.api.user.dto.UserShortDto;
-import ru.practicum.category.dao.CategoryRepository;
-import ru.practicum.category.mapper.CategoryMapper;
-import ru.practicum.client.StatsClient;
+import ru.practicum.client.UserActionClient;
 import ru.practicum.event.client.request.RequestClient;
 import ru.practicum.event.client.user.UserClient;
 import ru.practicum.event.dao.EventRepository;
@@ -29,9 +23,10 @@ import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.mapper.UserMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.shared.error.exception.BadRequestException;
+import ru.practicum.shared.error.exception.LikeValidationException;
 import ru.practicum.shared.error.exception.NotFoundException;
-import ru.practicum.shared.util.CategoryServiceUtil;
-import ru.practicum.shared.util.EventServiceUtil;
+import ru.practicum.shared.util.CategoryServiceHelper;
+import ru.practicum.shared.util.EventServiceHelper;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -43,18 +38,13 @@ import java.util.stream.Collectors;
 public class PublicEventServiceImpl implements PublicEventService {
 
     private final EventRepository eventRepository;
-    private final CategoryRepository categoryRepository;
-    private final EventServiceUtil eventServiceUtil;
     private final UserClient userClient;
     private final RequestClient requestClient;
-    private final StatsClient statsClient;
-    private final CategoryServiceUtil categoryServiceUtil;
+    private final UserActionClient userActionClient;
+    private final CategoryServiceHelper categoryServiceHelper;
+    private final EventServiceHelper eventServiceHelper;
     private final EventMapper eventMapper;
     private final UserMapper userMapper;
-    private final CategoryMapper categoryMapper;
-
-    @Value("${ru.practicum.explorewithme.appNameForStats}")
-    private String appName;
 
     @Override
     public List<EventShortDto> getAllByParams(EventParams params, HttpServletRequest request) {
@@ -87,24 +77,22 @@ public class PublicEventServiceImpl implements PublicEventService {
             return Collections.emptyList();
         }
 
-        buildStatsDtoAndHit(request);
-
-        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+        Map<Long, Double> ratings = eventServiceHelper.getRatingsMap(eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
                 .collect(Collectors.toSet());
         Set<Long> categoriesIds = new HashSet<>(params.getCategories());
 
-        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceHelper.getUserShortDtoMap(userIds);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoriesIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceHelper.getResponseCategoryDtoMap(categoriesIds);
 
-        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceHelper.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, ratings, eventMapper);
     }
 
     @Override
-    public EventFullDto getById(Long eventId, HttpServletRequest request) {
+    public EventFullDto getById(long userId, long eventId) {
         log.debug("Получение события с ID = {}", eventId);
 
         Event event = eventRepository.findByIdAndState(eventId, EventState.PUBLISHED)
@@ -112,20 +100,21 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
 
-        buildStatsDtoAndHit(request);
+        userActionClient.sendViewEvent(userId, eventId);
 
-        ResponseCategoryDto categoryDto = categoryServiceUtil
-                .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
+        ResponseCategoryDto categoryDto = categoryServiceHelper
+                .getResponseCategoryDto(event.getCategoryId());
 
         UserShortDto userShortDto = userMapper.toUserShortDto(userClient.getUserById(event.getInitiatorId()));
 
         if (event.getPublishedOn() == null) {
-            return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0L);
+            return eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, 0.0);
         }
 
-        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
+        double rating = eventServiceHelper.getRatingsMap(Set.of(event.getId()))
+                .getOrDefault(event.getId(), 0.0);
 
-        EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, views);
+        EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userShortDto, confirmedRequests, rating);
 
         log.debug("Получено событие с ID={}: {}", eventId, dto);
 
@@ -147,18 +136,19 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Long confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, Set.of(eventId)).getOrDefault(eventId, 0L);
 
-        ResponseCategoryDto categoryDto = categoryServiceUtil
-                .getResponseCategoryDto(categoryRepository, categoryMapper, event.getCategoryId());
+        ResponseCategoryDto categoryDto = categoryServiceHelper
+                .getResponseCategoryDto(event.getCategoryId());
 
         UserShortDto userDto = userMapper.toUserShortDto(userClient.getUserById(event.getInitiatorId()));
 
         if (event.getPublishedOn() == null) {
-            return eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, 0L);
+            return eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, 0.0);
         }
 
-        Long views = eventServiceUtil.getStatsViews(statsClient, event, true);
+        double rating = eventServiceHelper.getRatingsMap(Set.of(event.getId()))
+                .getOrDefault(event.getId(), 0.0);
 
-        EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, views);
+        EventFullDto dto = eventMapper.toEventFullDto(event, categoryDto, userDto, confirmedRequests, rating);
 
         log.debug("Получено событие с ID={}: {}", eventId, dto);
 
@@ -182,7 +172,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, dbEventIds);
 
-        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, dbEventIds);
+        Map<Long, Double> ratings = eventServiceHelper.getRatingsMap(dbEventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -191,12 +181,43 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .map(Event::getInitiatorId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceHelper.getUserShortDtoMap(userIds);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil
-                .getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoryIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceHelper
+                .getResponseCategoryDtoMap(categoryIds);
 
-        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceHelper.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, ratings, eventMapper);
+    }
+
+    @Override
+    public List<EventShortDto> getRecommendationsForUser(long userId) {
+        log.debug("Получен запрос на получение рекомендаций для пользователя с ID = {}", userId);
+
+        Map<Long, Double> recommendations = eventServiceHelper.getRecommendationsMap(userId);
+
+        if (recommendations.isEmpty()) {
+            log.warn("Не нашлось рекомендаций для пользователя с ID = {}", userId);
+            return Collections.emptyList();
+        }
+
+        log.debug("Рекомендации для пользователя с ID = {}, {}", userId, recommendations);
+
+        return getAllByIds(recommendations.keySet());
+    }
+
+    @Override
+    public void likeEvent(long userId, long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Событие c ID = " + eventId + " не найдено"));
+
+        if (event.getRequestModeration() || event.getParticipantLimit() != 0) {
+            if (event.getInitiatorId() != userId && requestClient.getEventRequests(userId, eventId).stream()
+                    .filter(o -> o.getStatus().equals(RequestStatus.CONFIRMED.name())).toList().isEmpty()) {
+                throw new LikeValidationException("Пользователь = " + userId + " не может лайкать мероприятие = " + eventId);
+            }
+        }
+
+        userActionClient.sendLikeEvent(userId, eventId);
     }
 
     private Pageable makePageable(EventParams params) {
@@ -204,20 +225,4 @@ public class PublicEventServiceImpl implements PublicEventService {
         return PageRequest.of(params.getFrom() / params.getSize(), params.getSize(), sort);
     }
 
-    private void buildStatsDtoAndHit(HttpServletRequest request) {
-        String ip = StatsUtil.getIpAddressOrDefault(request.getRemoteAddr());
-
-        log.debug("Получен IP-адрес: {}", ip);
-
-        StatsDto statsDto = StatsDto.builder()
-                .ip(ip)
-                .uri(request.getRequestURI())
-                .app(appName)
-                .timestamp(LocalDateTime.now())
-                .build();
-
-        log.debug("Сохранение статистики = {}", statsDto);
-        statsClient.hit(statsDto);
-        log.info("Статистика сохранена.");
-    }
 }

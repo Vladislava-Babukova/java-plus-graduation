@@ -10,9 +10,6 @@ import ru.practicum.api.category.dto.ResponseCategoryDto;
 import ru.practicum.api.event.dto.EventShortDto;
 import ru.practicum.api.request.enums.RequestStatus;
 import ru.practicum.api.user.dto.UserShortDto;
-import ru.practicum.category.dao.CategoryRepository;
-import ru.practicum.category.mapper.CategoryMapper;
-import ru.practicum.client.StatsClient;
 import ru.practicum.compilation.dao.CompilationRepository;
 import ru.practicum.compilation.dto.CreateCompilationDto;
 import ru.practicum.compilation.dto.ResponseCompilationDto;
@@ -20,14 +17,12 @@ import ru.practicum.compilation.dto.UpdateCompilationDto;
 import ru.practicum.compilation.mapper.CompilationMapper;
 import ru.practicum.compilation.model.Compilation;
 import ru.practicum.event.client.request.RequestClient;
-import ru.practicum.event.client.user.UserClient;
 import ru.practicum.event.dao.EventRepository;
 import ru.practicum.event.mapper.EventMapper;
-import ru.practicum.event.mapper.UserMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.shared.error.exception.NotFoundException;
-import ru.practicum.shared.util.CategoryServiceUtil;
-import ru.practicum.shared.util.EventServiceUtil;
+import ru.practicum.shared.util.CategoryServiceHelper;
+import ru.practicum.shared.util.EventServiceHelper;
 
 import java.util.*;
 import java.util.function.Function;
@@ -41,16 +36,11 @@ public class CompilationServiceImpl implements CompilationService {
 
     private final CompilationRepository compilationRepository;
     private final EventRepository eventRepository;
-    private final CategoryRepository categoryRepository;
-    private final EventServiceUtil eventServiceUtil;
-    private final UserClient userClient;
+    private final EventServiceHelper eventServiceHelper;
     private final RequestClient requestClient;
-    private final StatsClient statsClient;
-    private final CategoryServiceUtil categoryServiceUtil;
     private final CompilationMapper compilationMapper;
     private final EventMapper eventMapper;
-    private final UserMapper userMapper;
-    private final CategoryMapper categoryMapper;
+    private final CategoryServiceHelper categoryServiceHelper;
 
 
     @Override
@@ -183,7 +173,8 @@ public class CompilationServiceImpl implements CompilationService {
         List<Event> events = eventRepository.findAllById(new ArrayList<>(eventIds));
 
         Map<Long, Long> confirmedRequests = requestClient.getRequestsCountsByStatusAndEventIds(RequestStatus.CONFIRMED, eventIds);
-        Map<Long, Long> views = eventServiceUtil.getStatsViewsMap(statsClient, eventIds);
+
+        Map<Long, Double> ratings = eventServiceHelper.getRatingsMap(eventIds);
 
         Set<Long> userIds = events.stream()
                 .map(Event::getInitiatorId)
@@ -192,11 +183,11 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(Event::getCategoryId)
                 .collect(Collectors.toSet());
 
-        Map<Long, UserShortDto> userShortDtos = eventServiceUtil.getUserShortDtoMap(userClient, userIds, userMapper);
+        Map<Long, UserShortDto> userShortDtos = eventServiceHelper.getUserShortDtoMap(userIds);
 
-        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceUtil.getResponseCategoryDtoMap(categoryRepository, categoryMapper, categoryIds);
+        Map<Long, ResponseCategoryDto> categoryDtos = categoryServiceHelper.getResponseCategoryDtoMap(categoryIds);
 
-        return eventServiceUtil.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, views, eventMapper);
+        return eventServiceHelper.getEventShortDtos(userShortDtos, categoryDtos, events, confirmedRequests, ratings, eventMapper);
     }
 
 }
